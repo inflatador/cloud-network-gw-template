@@ -1,0 +1,127 @@
+heat_template_version: 2015-10-15
+
+description: |
+   ####  Creates a Cloud Network suitable for use with a Gateway Instance.
+   #### Author: Brian King
+   #### version: 0.0.5a
+   #### last modified: 2018-10-17
+
+parameter_groups:
+- label: Network Settings
+  parameters:
+  - networkName
+  - networkRange
+  - gatewayIP
+  - allocationPoolStart
+  - allocationPoolEnd
+
+- label: DNS Settings
+  parameters:
+    - primaryDNSIP
+    - secondaryDNSIP
+
+parameters:
+
+  networkName:
+    type: string
+    label: 'Cloud Network Name'
+    description: Name of Cloud Network
+    default: 'cloudNetwork'
+
+  networkRange:
+    type: string
+    label: 'Range of Cloud Network, such as 10.1.1.0/24'
+    description: CIDR (netrange) of Cloud Network
+    constraints:
+      - custom_constraint: net_cidr
+    default: '172.19.241.0/24'
+
+  gatewayIP:
+    type: string
+    label: 'Cloud Network Gateway IP'
+    default: '172.19.241.1'
+    constraints:
+      - custom_constraint: ip_addr
+
+  allocationPoolStart:
+    type: string
+    label: 'First available IP in pool. Recommend starting at 7th IP in range to leave room for net device reserved IPs.'
+    default: '172.19.241.7'
+    constraints:
+      - custom_constraint: ip_addr
+
+  allocationPoolEnd:
+    type: string
+    label: 'Last available IP in pool'
+    default: '172.19.241.254'
+    constraints:
+      - custom_constraint: ip_addr
+
+  primaryDNSIP:
+    type: string
+    label: 'Primary DNS Server. Mouse over the ? for each region''s DNS server IPs.'
+    description: 'DFW: 72.3.128.240, HKG: 120.136.32.62, IAD: 69.20.0.164, LON: 83.138.151.80, ORD: 173.203.4.8, SYD: 119.9.60.62'
+    default: 72.3.128.240
+    constraints:
+    - allowed_values:
+      - 72.3.128.240
+      - 120.136.32.62
+      - 69.20.0.164
+      - 83.138.151.80
+      - 173.203.4.8
+      - 119.9.60.62
+
+
+  secondaryDNSIP:
+    type: string
+    label: 'Secondary DNS Server. Mouse over the ? for each region''s server IPs.'
+    description: 'DFW: 72.3.128.241, HKG: 120.136.32.63, IAD: 69.20.0.196, LON: 83.138.151.81, ORD: 173.203.4.9, SYD: 119.9.60.63'
+    default: 72.3.128.241
+    constraints:
+    - allowed_values:
+      - 72.3.128.241
+      - 120.136.32.63
+      - 69.20.0.196
+      - 83.138.151.81
+      - 173.203.4.9
+      - 119.9.60.63
+
+resources:
+
+  cloudNetwork:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: [networkName] }
+
+  cloudNetworkSubnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: { get_param: [networkName] }
+      ip_version: 4
+      cidr: { get_param: [networkRange] }
+      dns_nameservers: [{ get_param: [primaryDNSIP] }, { get_param: [secondaryDNSIP] }]
+      network: { get_attr: [cloudNetwork, name] }
+      gateway_ip: { get_param: [gatewayIP] }
+      allocation_pools: [{'end': { get_param: [allocationPoolEnd]}, 'start': { get_param: [allocationPoolStart]} }]
+
+outputs:
+  cloudNetworkName:
+    value: { get_attr: [cloudNetwork, name] }
+    description: 'Cloud Network name'
+
+  cloudNetworkRange:
+    value: { get_attr: [cloudNetworkSubnet, cidr] }
+    description: 'Cloud Network range'
+
+  cloudNetworkGatewayIP:
+    value: { get_attr: [cloudNetworkSubnet, gateway_ip] }
+    description: 'Cloud Network gateway IP'
+
+  allocationPool:
+    value: { get_attr: [cloudNetworkSubnet, allocation_pools] }
+    description: 'Subnet allocation pool'
+
+  dnsServerIPs:
+    value: { get_attr: [cloudNetworkSubnet, dns_nameservers] }
+    description: 'DNS Server IPs'
+
